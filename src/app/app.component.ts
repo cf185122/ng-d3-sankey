@@ -9,6 +9,7 @@ import { UserFlowService } from './user-flow.service';
 import { UserFlow } from './models/user-flow';
 
 
+
 const DROPOUT_NODE_NAME = 'dropout';
 @Component({
   selector: 'app-root',
@@ -22,6 +23,7 @@ export class AppComponent implements OnInit, OnDestroy {
   userFlowData: UserFlow;
   isUfCollapsed = false;
   isFetchingUserFlowData = false;
+  
 
   constructor(
     private ngZone: NgZone,
@@ -33,6 +35,11 @@ export class AppComponent implements OnInit, OnDestroy {
     window['ue']['userFlow'] = window['ue']['userFlow'] || {};
     window['ue']['userFlow'].publicFunc = this.publicFunc.bind(this);
   }
+
+  attributeClicked : boolean;
+  clicked : boolean;
+  nodeData : any[];
+  link : any;
 
   ngOnInit(): void {
     this.loadData();
@@ -120,11 +127,11 @@ export class AppComponent implements OnInit, OnDestroy {
       .attr('font-size', 10)
       .attr('font-weight', 'bold')
       .attr('transform', (d, i) => 'translate(' + d + ', 10)')
-      .text((d, i) => {
-        if (i < interactions) {
-          return formatInteraction(i + 1) + ' interaction';
-        } else { return ''; }
-      });
+      // .text((d, i) => {
+      //   if (i < interactions) {
+      //     return formatInteraction(i + 1) + ' interaction';
+      //   } else { return ''; }
+      // });
 
     // add svg for graph
     const svg = d3.select('#sankey').append('svg')
@@ -143,8 +150,8 @@ export class AppComponent implements OnInit, OnDestroy {
       )
       .attr('fill', 'none')
       .attr('stroke', '#9e9e9e')
-      .style('opacity', '0.7')
-      .attr('stroke-width', (d: any) => Math.max(1, d.width))
+      // .style('opacity', '0.7')
+      .attr('stroke-width', (d: any) => Math.max(1, 5))
       .attr('class', 'link')
       .sort((a: any, b: any) => {
         if (a.target.name.toLowerCase() === DROPOUT_NODE_NAME) {
@@ -154,44 +161,9 @@ export class AppComponent implements OnInit, OnDestroy {
         } else {
           return 0;
         }
-      })
-      ;
-
-    // plotting dropout nodes
-    const dropLink = svg.append('g')
-      .selectAll('.link')
-      .data(chartData.links)
-      .enter()
-      .filter((l: any) => l.target.name.toLowerCase() === DROPOUT_NODE_NAME)
-      .append('rect')
-      .attr('x', (d: any) => d.source.x1)
-      .attr('y', (d: any) => {
-        if (d.source.drop > 0) {
-          let totalWidth = 0;
-          for (const elm of d.source.sourceLinks) {
-            if (elm.target.name.toLowerCase() === DROPOUT_NODE_NAME) {
-              break;
-            } else if (elm.value >= d.source.drop && elm.target.name.toLowerCase() !== DROPOUT_NODE_NAME) {
-              totalWidth += elm.width;
-            }
-          }
-          return d.source.y0 + totalWidth;
-        } else {
-          return d.source.y0;
-        }
-      })
-      .attr('height', (d: any) => Math.abs(d.target.y0 - d.target.y1))
-      .attr('width', (d: any) => sankey.nodeWidth() + 3)
-      .attr('fill', '#f44336')
-      .attr('stroke', '#f44336')
-      .attr('class', 'dropout-node')
-      .on('click', (l: any) => {
-        fnOnDropOutLinkClicked(l);
       });
 
-    dropLink.append('title')
-      .text((d: any) => d.source.name + '\n' +
-        'Dropouts ' + format(d.value));
+      this.link = link;
 
     // add the link titles
     link.append('title')
@@ -203,11 +175,11 @@ export class AppComponent implements OnInit, OnDestroy {
       .data(chartData.nodes)
       .enter().append('g')
       .attr('class', 'node')
-      .on('mouseover', fade(1))
-      .on('mouseout', fade(0.7))
       .on('click', (d) => {
         fnOnNodeClicked(d);
-      });
+      })
+      .on('mouseover', fade(0.1))
+      .on('mouseout', fade(1));
 
     node.append('rect')
       .filter((d: any) => d.name.toLowerCase() !== DROPOUT_NODE_NAME)
@@ -215,22 +187,21 @@ export class AppComponent implements OnInit, OnDestroy {
       .attr('y', (d: any) => d.y0)
       .attr('height', (d: any) => d.y1 - d.y0)
       .attr('width', (d: any) => d.x1 - d.x0)
-      .attr('fill', '#2196f3')
+      .attr("fill", function (d: any) { return color(d.category.replace(/ .*/, "")); })
       .append('title')
-      .text((d: any) => d.name + '\n' + format(d.value));
+      .text((d: any) => d.name + '\n' + format(d.value))
+      .on('mouseover', fade(0.1))
+      .on('mouseout', fade(1));
 
-    node.append('text')
-      .filter((d: any) => d.name.toLowerCase() !== DROPOUT_NODE_NAME)
-      .attr('x', (d: any) => d.x1 + 20)
-      .attr('y', (d: any) => (d.y1 + d.y0) / 2)
-      .attr('dy', '0.35em')
-      .attr('font-size', 10)
-      .attr('font-family', 'Roboto')
-      .attr('text-anchor', 'end')
-      .text((d: any) => truncateText(d.name, 20))
-      .attr('text-anchor', 'start')
-      .append('title')
-      .text((d: any) => d.name);
+      node.append('text')
+      .attr("x", function (d: any) { return d.x0 - 6; })
+      .attr("y", function (d: any) { return (d.y1 + d.y0) / 2; })
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "end")
+      .text(function (d: any) { return d.name; })
+      .filter(function (d: any) { return d.x0 < width / 2; })
+      .attr("x", function (d: any) { return d.x1 + 6; })
+      .attr("text-anchor", "start");
 
     /* miscellaneous functions */
 
@@ -238,6 +209,7 @@ export class AppComponent implements OnInit, OnDestroy {
     function fade(opacity: any): any {
       return (g, i) => {
 
+        
         svg.selectAll('.link')
           .filter((d: any) => d.source.node !== chartData.nodes[i].node && d.target.node !== chartData.nodes[i].node)
           .transition()
@@ -260,11 +232,6 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     }
 
-    // function gets called on click of a dropout node
-    function fnOnDropOutLinkClicked(dropOutLink: any): void {
-      window['ue']['userFlow'].publicFunc(dropOutLink.target, true);
-    }
-
     // function gets called on click of a node
     function fnOnNodeClicked(clickedNode: any): void {
       window['ue']['userFlow'].publicFunc(clickedNode);
@@ -283,19 +250,61 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   nodeClicked(node: any, isDropout: boolean): void {
-    if (isDropout) {
-      console.log('dropout node clicked', node);
-    } else {
       console.log('node clicked', node);
-    }
+      this.clicked = true;
+      this.nodeData = node.fields;
+      // console.log(this.nodeData);
   }
 
+  onClick(data){
+    console.log(data);
+    this.attributeClicked = true;
+  }
 
   ngOnDestroy(): void {
     // Unsubscribe from all subscriptions
     this.unsubscribeAll.next();
     this.unsubscribeAll.complete();
     window['ue']['userFlow'].publicFunc = null;
+  }
+
+  onClear(){
+    this.clicked = false;
+    this.loadData();
+  }
+
+  onSearch(nodeSearched){
+
+    let searchNodes = this.userFlowData.nodes;
+    let searchLinks = this.userFlowData.links;
+
+    let tempNodes : any[] = [];
+    let tempLinks : any[] = [];
+
+    for (let i = 0; i < searchNodes.length; i++) {
+      if (searchNodes[i].name == nodeSearched) {
+
+        let nodeNumber = searchNodes[i].node;
+
+        for (let j = 0; j < searchLinks.length; j++) {
+          
+          if ((searchLinks[j].source.node == nodeNumber) || (searchLinks[j].target.node == nodeNumber)) {
+            tempLinks.push(searchLinks[j]);
+          }
+        }
+
+
+      } 
+    }
+    this.userFlowData.nodes = searchNodes;
+    this.userFlowData.links = tempLinks;
+    if (this.userFlowData.links.length) {
+      this.drawChart(this.userFlowData);
+    }
+    else {
+      this.loadData();
+    }
+    this.isFetchingUserFlowData = false;
   }
 
 }

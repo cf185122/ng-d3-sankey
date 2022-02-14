@@ -11,10 +11,14 @@ const DEFAULT_PERFECT_SCROLLBAR_CONFIG: PerfectScrollbarConfigInterface = {
 
 import { AppComponent } from './app.component';
 import { UserFlowService } from './user-flow.service';
+import { SearchFilterPipe } from './search-filter.pipe';
+
+
 
 @NgModule({
   declarations: [
-    AppComponent
+    AppComponent,
+    SearchFilterPipe
   ],
   imports: [
     BrowserModule,
